@@ -54,6 +54,7 @@ import eu.kanade.presentation.reader.ReaderContentOverlay
 import eu.kanade.presentation.reader.ReaderPageActionsDialog
 import eu.kanade.presentation.reader.ReaderPageIndicator
 import eu.kanade.presentation.reader.ReadingModeSelectDialog
+import eu.kanade.presentation.reader.SourceReactionPromptDialog
 import eu.kanade.presentation.reader.appbars.ReaderAppBars
 import eu.kanade.presentation.reader.components.ChapterNavigatorType
 import eu.kanade.presentation.reader.settings.ReaderSettingsDialog
@@ -152,6 +153,11 @@ class ReaderActivity : BaseActivity() {
 
     private var isAutoScrolling by mutableStateOf(false)
         private set
+
+    /**
+     * Whether auto-scroll was running when the upvote prompt opened, so it can resume on dismiss.
+     */
+    private var sourceReactionResumeAutoScroll = false
 
     /**
      * Called when the activity is created. Initializes the presenter and configuration.
@@ -253,6 +259,11 @@ class ReaderActivity : BaseActivity() {
                     is ReaderViewModel.Event.SetCoverResult -> {
                         onSetAsCoverResult(event.result)
                     }
+                    is ReaderViewModel.Event.ShowSourceReactionPrompt -> {
+                        sourceReactionResumeAutoScroll = isAutoScrolling
+                        stopAutoScroll()
+                        viewModel.openSourceReactionPromptDialog(event.chapterName, event.url)
+                    }
                 }
             }
             .launchIn(lifecycleScope)
@@ -287,7 +298,7 @@ class ReaderActivity : BaseActivity() {
         }
 
         val onDismissRequest = viewModel::closeDialog
-        when (state.dialog) {
+        when (val dialog = state.dialog) {
             is ReaderViewModel.Dialog.Loading -> {
                 AlertDialog(
                     onDismissRequest = {},
@@ -341,8 +352,39 @@ class ReaderActivity : BaseActivity() {
                     onSave = viewModel::saveImage,
                 )
             }
+            is ReaderViewModel.Dialog.SourceReactionPrompt -> {
+                SourceReactionPromptDialog(
+                    chapterName = dialog.chapterName,
+                    onDismissRequest = {
+                        viewModel.closeDialog()
+                        resumeAutoScrollAfterSourceReactionPrompt()
+                    },
+                    onUpvote = {
+                        viewModel.closeDialog()
+                        sourceReactionResumeAutoScroll = false
+                        openSourceReactionInWebView(dialog.url)
+                    },
+                    onDontAskAgain = {
+                        viewModel.skipSourceReactionForCurrentManga()
+                        viewModel.closeDialog()
+                        resumeAutoScrollAfterSourceReactionPrompt()
+                    },
+                )
+            }
             null -> {}
         }
+    }
+
+    private fun resumeAutoScrollAfterSourceReactionPrompt() {
+        if (sourceReactionResumeAutoScroll) {
+            sourceReactionResumeAutoScroll = false
+            startAutoScroll()
+        }
+    }
+
+    private fun openSourceReactionInWebView(url: String) {
+        val source = viewModel.getSource() ?: return
+        startActivity(WebViewActivity.newIntent(this, url, source.id, viewModel.manga?.title))
     }
 
     /**
@@ -564,6 +606,7 @@ class ReaderActivity : BaseActivity() {
         stopAutoScroll()
         viewer.onAutoScrollStarted()
         isAutoScrolling = true
+        updateKeepScreenOn()
         autoScrollJob = lifecycleScope.launch {
             val frameMillis = AUTO_SCROLL_FRAME_MILLIS
             while (isActive) {
@@ -575,6 +618,7 @@ class ReaderActivity : BaseActivity() {
             }
             isAutoScrolling = false
             autoScrollJob = null
+            updateKeepScreenOn()
         }
     }
 
@@ -582,6 +626,20 @@ class ReaderActivity : BaseActivity() {
         autoScrollJob?.cancel()
         autoScrollJob = null
         isAutoScrolling = false
+        updateKeepScreenOn()
+    }
+
+    /**
+     * Keeps the screen on while the user preference asks for it, or while auto-scrolling so the
+     * reader can't fall asleep mid-scroll.
+     */
+    private fun updateKeepScreenOn() {
+        val enabled = readerPreferences.keepScreenOn.get() || isAutoScrolling
+        if (enabled) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     /**
@@ -916,7 +974,7 @@ class ReaderActivity : BaseActivity() {
                 .launchIn(lifecycleScope)
 
             readerPreferences.keepScreenOn.changes()
-                .onEach(::setKeepScreenOn)
+                .onEach { updateKeepScreenOn() }
                 .launchIn(lifecycleScope)
 
             readerPreferences.customBrightness.changes()
@@ -940,17 +998,6 @@ class ReaderActivity : BaseActivity() {
                     updateViewerInset(fullscreen, drawUnderCutout)
                 }
                 .launchIn(lifecycleScope)
-        }
-
-        /**
-         * Sets the keep screen on mode according to [enabled].
-         */
-        private fun setKeepScreenOn(enabled: Boolean) {
-            if (enabled) {
-                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            } else {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            }
         }
 
         /**

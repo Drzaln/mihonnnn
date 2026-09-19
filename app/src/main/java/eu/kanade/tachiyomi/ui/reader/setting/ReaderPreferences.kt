@@ -110,6 +110,13 @@ class ReaderPreferences(
 
     val autoScrollSpeed: Preference<Int> = preferenceStore.getInt("pref_auto_scroll_speed", 20)
 
+    val promptSourceReaction: Preference<Boolean> = preferenceStore.getBoolean("pref_source_reaction_prompt", false)
+
+    val sourceReactionSkippedMangaIds: Preference<Set<String>> = preferenceStore.getStringSet(
+        "pref_source_reaction_skipped_manga_ids",
+        emptySet(),
+    )
+
     // endregion
 
     // region Split two-page spread
