@@ -190,6 +190,11 @@ class ReaderViewModel(
 
     private var chapterToDownload: Download? = null
 
+    /**
+     * Chapters the user has already been asked to leave a reaction for in this session.
+     */
+    private val promptedReactionChapterIds = mutableSetOf<Long>()
+
     private val unfilteredChapterList by lazy {
         val manga = manga!!
         runBlocking { getChaptersByMangaId.await(manga.id, applyScanlatorFilter = false) }
@@ -633,7 +638,34 @@ class ReaderViewModel(
 
             upsertHistory.await(HistoryUpdate(chapterId, endTime, sessionReadDuration))
             chapterReadStartTime = null
+
+            maybePromptSourceReaction(readerChapter)
         }
+    }
+
+    /**
+     * Offers to open the source's website so the user can upvote the chapter they just left.
+     * Only fires once per chapter, for finished chapters on a source that exposes a chapter URL.
+     */
+    private fun maybePromptSourceReaction(readerChapter: ReaderChapter) {
+        if (!readerPreferences.promptSourceReaction.get()) return
+        if (!readerChapter.chapter.read) return
+
+        val manga = manga ?: return
+        if (readerPreferences.sourceReactionSkippedMangaIds.get().contains(manga.id.toString())) return
+
+        val chapterId = readerChapter.chapter.id ?: return
+        if (!promptedReactionChapterIds.add(chapterId)) return
+
+        val url = getChapterUrl(readerChapter) ?: return
+
+        eventChannel.trySend(Event.ShowSourceReactionPrompt(readerChapter.chapter.name, url))
+    }
+
+    fun skipSourceReactionForCurrentManga() {
+        val manga = manga ?: return
+        val pref = readerPreferences.sourceReactionSkippedMangaIds
+        pref.set(pref.get() + manga.id.toString())
     }
 
     /**
@@ -662,11 +694,15 @@ class ReaderViewModel(
     fun getSource() = state.value.source as? HttpSource
 
     fun getChapterUrl(): String? {
-        val sChapter = getCurrentChapter()?.chapter ?: return null
+        val readerChapter = getCurrentChapter() ?: return null
+        return getChapterUrl(readerChapter)
+    }
+
+    private fun getChapterUrl(readerChapter: ReaderChapter): String? {
         val source = getSource() ?: return null
 
         return try {
-            source.getChapterUrl(sChapter)
+            source.getChapterUrl(readerChapter.chapter)
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
             null
@@ -812,6 +848,10 @@ class ReaderViewModel(
 
     fun openPageDialog(page: ReaderPage) {
         mutableState.update { it.copy(dialog = Dialog.PageActions(page)) }
+    }
+
+    fun openSourceReactionPromptDialog(chapterName: String, url: String) {
+        mutableState.update { it.copy(dialog = Dialog.SourceReactionPrompt(chapterName, url)) }
     }
 
     fun openSettingsDialog() {
@@ -1007,6 +1047,7 @@ class ReaderViewModel(
         data object ReadingModeSelect : Dialog
         data object OrientationModeSelect : Dialog
         data class PageActions(val page: ReaderPage) : Dialog
+        data class SourceReactionPrompt(val chapterName: String, val url: String) : Dialog
     }
 
     sealed interface Event {
@@ -1018,5 +1059,6 @@ class ReaderViewModel(
         data class SavedImage(val result: SaveImageResult) : Event
         data class ShareImage(val uri: Uri, val page: ReaderPage) : Event
         data class CopyImage(val uri: Uri) : Event
+        data class ShowSourceReactionPrompt(val chapterName: String, val url: String) : Event
     }
 }

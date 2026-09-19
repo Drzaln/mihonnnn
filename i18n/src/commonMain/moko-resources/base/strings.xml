@@ -541,6 +541,12 @@
     <string name="pref_continuous_gap">Gap</string>
     <string name="pref_auto_scroll_speed">Auto-scroll speed</string>
     <string name="action_auto_scroll">Auto scroll</string>
+    <string name="pref_source_reaction_prompt">Ask to upvote after each chapter</string>
+    <string name="source_reaction_prompt_title">Support the source?</string>
+    <string name="source_reaction_prompt_message">Finished %1$s. Open the source\'s website to leave an upvote?</string>
+    <string name="action_upvote">Upvote</string>
+    <string name="action_not_now">Not now</string>
+    <string name="action_dont_ask_again">Don\'t ask again</string>
 
       <!-- Downloads section -->
     <string name="pref_category_delete_chapters">Delete chapters</string>
