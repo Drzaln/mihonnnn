@@ -737,7 +737,7 @@ class ReaderActivity : BaseActivity() {
         viewModel.state.value.viewer?.setChapters(viewerChapters)
 
         lifecycleScope.launchIO {
-            viewModel.getChapterUrl()?.let { url ->
+            viewModel.getChapterOrMangaUrl()?.let { url ->
                 assistUrl = url
             }
         }

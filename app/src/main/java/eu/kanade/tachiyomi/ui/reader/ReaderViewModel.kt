@@ -667,6 +667,16 @@ class ReaderViewModel(
     }
 
     /**
+     * URL to open/share for the active chapter: its web page when the source reports a usable one,
+     * otherwise the series page. Same resolution the reaction prompt uses.
+     */
+    fun getChapterOrMangaUrl(): String? {
+        val readerChapter = getCurrentChapter() ?: return null
+        getChapterUrl(readerChapter)?.takeIf { it.hasWebPath() }?.let { return it }
+        return getMangaUrl()
+    }
+
+    /**
      * Picks the URL to open for the reaction prompt: the chapter's web page when the source reports
      * a usable one, otherwise the series page. Some sources store a bare id as the chapter URL and
      * never override [HttpSource.getChapterUrl], which yields a domain-plus-id URL with no path.
@@ -724,11 +734,6 @@ class ReaderViewModel(
     }
 
     fun getSource() = state.value.source as? HttpSource
-
-    fun getChapterUrl(): String? {
-        val readerChapter = getCurrentChapter() ?: return null
-        return getChapterUrl(readerChapter)
-    }
 
     private fun getChapterUrl(readerChapter: ReaderChapter): String? {
         val source = getSource() ?: return null
