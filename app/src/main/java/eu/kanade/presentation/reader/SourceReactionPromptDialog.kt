@@ -11,6 +11,7 @@ import tachiyomi.presentation.core.i18n.stringResource
 @Composable
 fun SourceReactionPromptDialog(
     chapterName: String,
+    isSeriesFallback: Boolean,
     onDismissRequest: () -> Unit,
     onUpvote: () -> Unit,
     onDontAskAgain: () -> Unit,
@@ -21,7 +22,11 @@ fun SourceReactionPromptDialog(
         text = { Text(stringResource(MR.strings.source_reaction_prompt_message, chapterName)) },
         confirmButton = {
             TextButton(onClick = onUpvote) {
-                Text(stringResource(MR.strings.action_upvote))
+                Text(
+                    stringResource(
+                        if (isSeriesFallback) MR.strings.action_open_series else MR.strings.action_upvote,
+                    ),
+                )
             }
         },
         dismissButton = {
