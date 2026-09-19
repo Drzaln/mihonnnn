@@ -99,3 +99,26 @@
     public <init>();
     public void destroy();
 }
+
+##---------------Begin: aggressive optimization  ----------
+# Broadens access modifiers where it enables better inlining and optimization. Safe here because
+# names stay unobfuscated (-dontobfuscate) and the extension ABI is pinned by the keeps above.
+-allowaccessmodification
+
+# Strip logging from release builds. logcat bottoms out in android.util.Log; the library itself
+# isn't inlined, so assume its logging entry points have no side effects to let R8 drop the call
+# sites (including the message lambdas and their string constants).
+-assumenosideeffects class android.util.Log {
+    public static *** v(...);
+    public static *** d(...);
+    public static *** i(...);
+    public static *** w(...);
+    public static *** e(...);
+    public static *** wtf(...);
+    public static *** println(...);
+}
+-assumenosideeffects class logcat.Logcat {
+    public static *** logcat(...);
+    public static *** logcat$default(...);
+}
+##---------------End: aggressive optimization  ----------
