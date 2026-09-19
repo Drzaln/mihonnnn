@@ -545,6 +545,7 @@
     <string name="source_reaction_prompt_title">Support the source?</string>
     <string name="source_reaction_prompt_message">Finished %1$s. Open the source\'s website to leave an upvote?</string>
     <string name="action_upvote">Upvote</string>
+    <string name="action_open_series">Open series page</string>
     <string name="action_not_now">Not now</string>
     <string name="action_dont_ask_again">Don\'t ask again</string>
 

@@ -262,7 +262,11 @@ class ReaderActivity : BaseActivity() {
                     is ReaderViewModel.Event.ShowSourceReactionPrompt -> {
                         sourceReactionResumeAutoScroll = isAutoScrolling
                         stopAutoScroll()
-                        viewModel.openSourceReactionPromptDialog(event.chapterName, event.url)
+                        viewModel.openSourceReactionPromptDialog(
+                            event.chapterName,
+                            event.url,
+                            event.isSeriesFallback,
+                        )
                     }
                 }
             }
@@ -355,6 +359,7 @@ class ReaderActivity : BaseActivity() {
             is ReaderViewModel.Dialog.SourceReactionPrompt -> {
                 SourceReactionPromptDialog(
                     chapterName = dialog.chapterName,
+                    isSeriesFallback = dialog.isSeriesFallback,
                     onDismissRequest = {
                         viewModel.closeDialog()
                         resumeAutoScrollAfterSourceReactionPrompt()

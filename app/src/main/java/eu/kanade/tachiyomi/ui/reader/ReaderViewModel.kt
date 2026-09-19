@@ -22,6 +22,7 @@ import eu.kanade.domain.manga.interactor.SetMangaViewerFlags
 import eu.kanade.domain.manga.interactor.UpdateManga
 import eu.kanade.domain.manga.model.readerOrientation
 import eu.kanade.domain.manga.model.readingMode
+import eu.kanade.domain.manga.model.toSManga
 import eu.kanade.domain.source.interactor.GetIncognitoState
 import eu.kanade.domain.track.interactor.TrackChapter
 import eu.kanade.domain.track.service.TrackPreferences
@@ -69,6 +70,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import logcat.LogPriority
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import tachiyomi.core.common.preference.toggle
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.launchNonCancellable
@@ -657,9 +659,39 @@ class ReaderViewModel(
         val chapterId = readerChapter.chapter.id ?: return
         if (!promptedReactionChapterIds.add(chapterId)) return
 
-        val url = getChapterUrl(readerChapter) ?: return
+        val resolved = resolveReactionUrl(readerChapter) ?: return
 
-        eventChannel.trySend(Event.ShowSourceReactionPrompt(readerChapter.chapter.name, url))
+        eventChannel.trySend(
+            Event.ShowSourceReactionPrompt(readerChapter.chapter.name, resolved.first, resolved.second),
+        )
+    }
+
+    /**
+     * Picks the URL to open for the reaction prompt: the chapter's web page when the source reports
+     * a usable one, otherwise the series page. Some sources store a bare id as the chapter URL and
+     * never override [HttpSource.getChapterUrl], which yields a domain-plus-id URL with no path.
+     *
+     * @return the URL and whether it fell back to the series page.
+     */
+    private fun resolveReactionUrl(readerChapter: ReaderChapter): Pair<String, Boolean>? {
+        getChapterUrl(readerChapter)?.takeIf { it.hasWebPath() }?.let { return it to false }
+        getMangaUrl()?.let { return it to true }
+        return null
+    }
+
+    private fun String.hasWebPath(): Boolean =
+        toHttpUrlOrNull()?.pathSegments?.any { it.isNotBlank() } == true
+
+    private fun getMangaUrl(): String? {
+        val source = getSource() ?: return null
+        val manga = manga ?: return null
+
+        return try {
+            source.getMangaUrl(manga.toSManga())
+        } catch (e: Exception) {
+            logcat(LogPriority.ERROR, e)
+            null
+        }
     }
 
     fun skipSourceReactionForCurrentManga() {
@@ -850,8 +882,10 @@ class ReaderViewModel(
         mutableState.update { it.copy(dialog = Dialog.PageActions(page)) }
     }
 
-    fun openSourceReactionPromptDialog(chapterName: String, url: String) {
-        mutableState.update { it.copy(dialog = Dialog.SourceReactionPrompt(chapterName, url)) }
+    fun openSourceReactionPromptDialog(chapterName: String, url: String, isSeriesFallback: Boolean) {
+        mutableState.update {
+            it.copy(dialog = Dialog.SourceReactionPrompt(chapterName, url, isSeriesFallback))
+        }
     }
 
     fun openSettingsDialog() {
@@ -1047,7 +1081,11 @@ class ReaderViewModel(
         data object ReadingModeSelect : Dialog
         data object OrientationModeSelect : Dialog
         data class PageActions(val page: ReaderPage) : Dialog
-        data class SourceReactionPrompt(val chapterName: String, val url: String) : Dialog
+        data class SourceReactionPrompt(
+            val chapterName: String,
+            val url: String,
+            val isSeriesFallback: Boolean,
+        ) : Dialog
     }
 
     sealed interface Event {
@@ -1059,6 +1097,10 @@ class ReaderViewModel(
         data class SavedImage(val result: SaveImageResult) : Event
         data class ShareImage(val uri: Uri, val page: ReaderPage) : Event
         data class CopyImage(val uri: Uri) : Event
-        data class ShowSourceReactionPrompt(val chapterName: String, val url: String) : Event
+        data class ShowSourceReactionPrompt(
+            val chapterName: String,
+            val url: String,
+            val isSeriesFallback: Boolean,
+        ) : Event
     }
 }
