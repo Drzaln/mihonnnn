@@ -15,6 +15,7 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsViewModel
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
+import eu.kanade.tachiyomi.ui.reader.viewer.AutoScroll
 import eu.kanade.tachiyomi.ui.reader.viewer.webgpu.WebGpuViewer
 import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonViewer
 import mihon.app.di.appGraph
@@ -34,6 +35,15 @@ internal fun ColumnScope.ReadingModePage(viewModel: ReaderSettingsViewModel) {
     val viewer by viewModel.viewerFlow.collectAsState()
 
     val readingMode = remember(manga) { ReadingMode.fromPreference(manga?.readingMode?.toInt()) }
+    val default = LocalContext.current.appGraph.readerPreferences.defaultReadingMode.get()
+    val resolved = remember(readingMode, default) {
+        ReadingMode.fromPreference(
+            when {
+                readingMode == ReadingMode.DEFAULT -> default
+                else -> manga?.readingMode?.toInt() ?: default
+            },
+        )
+    }
     SettingsChipRow(MR.strings.pref_category_reading_mode) {
         ReadingMode.entries.map {
             FilterChip(
@@ -44,14 +54,26 @@ internal fun ColumnScope.ReadingModePage(viewModel: ReaderSettingsViewModel) {
         }
     }
 
-    if (viewer is WebGpuViewer) {
-        val default = LocalContext.current.appGraph.readerPreferences.defaultReadingMode.get()
-        val resolved = ReadingMode.fromPreference(
-            when {
-                readingMode == ReadingMode.DEFAULT -> default
-                else -> manga?.readingMode?.toInt() ?: default
+    if (
+        resolved == ReadingMode.VERTICAL ||
+        resolved == ReadingMode.WEBTOON ||
+        resolved == ReadingMode.CONTINUOUS_VERTICAL
+    ) {
+        val numberFormat = remember { NumberFormat.getPercentInstance() }
+        val autoScrollSpeed by viewModel.preferences.autoScrollSpeed.collectAsState()
+        SliderItem(
+            value = autoScrollSpeed,
+            valueRange = AutoScroll.MIN_SPEED..AutoScroll.MAX_SPEED,
+            label = stringResource(MR.strings.pref_auto_scroll_speed),
+            valueString = numberFormat.format(autoScrollSpeed / 100f),
+            onChange = {
+                viewModel.preferences.autoScrollSpeed.set(it)
             },
+            pillColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         )
+    }
+
+    if (viewer is WebGpuViewer) {
         if (resolved == ReadingMode.LEFT_TO_RIGHT || resolved == ReadingMode.RIGHT_TO_LEFT) {
             val dualPageView by viewModel.preferences.dualPageView.collectAsState()
             SettingsChipRow(MR.strings.pref_dual_page_view) {

@@ -43,6 +43,7 @@ import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.model.ViewerChapters
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences.TransitionAnimation
+import eu.kanade.tachiyomi.ui.reader.viewer.AutoScroll
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView.ZoomStartPosition
 import eu.kanade.tachiyomi.ui.reader.viewer.Viewer
 import eu.kanade.tachiyomi.ui.reader.viewer.ViewerNavigation.NavigationRegion
@@ -1030,6 +1031,28 @@ open class WebGpuViewer(
     }
 
     override fun getView(): View = pager
+
+    private var autoScrollElapsed = 0L
+
+    override val supportsAutoScroll: Boolean get() = isVertical && !isContinuous
+
+    override fun onAutoScrollStarted() {
+        autoScrollElapsed = 0L
+    }
+
+    override fun onAutoScrollFrame(elapsedMillis: Long, speedPercent: Int): Boolean {
+        if (!isVertical || isContinuous) return false
+        autoScrollElapsed += elapsedMillis
+        if (autoScrollElapsed < AutoScroll.pageIntervalMillis(speedPercent)) {
+            return true
+        }
+        autoScrollElapsed = 0L
+        if (!pager.state.haveNext) {
+            return false
+        }
+        moveToNext()
+        return true
+    }
 
     /** Downloads [page] if needed, then re-queues it for decode once ready. */
     private fun startPageLoad(page: ViewerReaderPage) {

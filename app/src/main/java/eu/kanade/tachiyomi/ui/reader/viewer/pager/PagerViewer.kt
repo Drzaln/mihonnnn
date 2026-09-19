@@ -321,6 +321,11 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
     }
 
     /**
+     * Number of pages (including chapter transitions) currently held by the adapter.
+     */
+    protected val adapterItemCount: Int get() = adapter.count
+
+    /**
      * Moves to the previous page.
      */
     open fun moveToPrevious() {

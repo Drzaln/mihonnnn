@@ -4,6 +4,7 @@ import ca.mpreg.webgpuviewer.ImageViewContinuous
 import ca.mpreg.webgpuviewer.viewer.ImagePage
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
+import eu.kanade.tachiyomi.ui.reader.viewer.AutoScroll
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
@@ -11,6 +12,27 @@ class WebGpuViewerContinuous(activity: ReaderActivity, val useGap: Boolean = fal
     WebGpuViewer(activity, isReversed = false, isVertical = true, pager = ImageViewContinuous(activity)) {
 
     override val isContinuous: Boolean = true
+
+    override val supportsAutoScroll: Boolean = true
+
+    private var autoScrollRemainder = 0f
+
+    override fun onAutoScrollStarted() {
+        autoScrollRemainder = 0f
+    }
+
+    override fun onAutoScrollFrame(elapsedMillis: Long, speedPercent: Int): Boolean {
+        val density = state.density.density
+        val speed = speedPercent.coerceIn(AutoScroll.MIN_SPEED, AutoScroll.MAX_SPEED) / 100f
+        autoScrollRemainder += speed * AutoScroll.MAX_DP_PER_SECOND * density * (elapsedMillis / 1000f)
+        val delta = autoScrollRemainder.toInt()
+        if (delta != 0) {
+            autoScrollRemainder -= delta
+            state.scrollBy(delta.toFloat())
+            state.invalidate()
+        }
+        return true
+    }
 
     // How many pages the viewport shows depends on the zoom, and a page on screen has to be
     // decoded rather than merely reserved - so the window follows what the last frame reached.

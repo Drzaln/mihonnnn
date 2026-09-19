@@ -1,0 +1,65 @@
+name: Fork Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: fork-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Publish
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Full history so the commit count matches the value baked into the app.
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          java-version-file: .github/.java-version
+          distribution: temurin
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Compute version
+        run: echo "COMMIT_COUNT=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: ./gradlew assembleNightly -Penable-updater
+        env:
+          # Makes the release APK use the keystore from the secrets below, instead of an
+          # ephemeral runner-generated debug key - required for in-app updates to install.
+          MIHON_GITHUB_RELEASE: true
+          storeFileBase64: ${{ secrets.SIGNING_KEY }}
+          storePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+          keyAlias: ${{ secrets.ALIAS }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          # Nightly build type compares this tag against the app's commit count.
+          tag_name: r${{ env.COMMIT_COUNT }}
+          name: Fork build r${{ env.COMMIT_COUNT }}
+          body: Automatic build from `${{ github.sha }}`.
+          draft: false
+          prerelease: false
+          files: |
+            app/build/outputs/apk/nightly/app-arm64-v8a-nightly.apk
+            app/build/outputs/apk/nightly/app-armeabi-v7a-nightly.apk
+            app/build/outputs/apk/nightly/app-x86-nightly.apk
+            app/build/outputs/apk/nightly/app-x86_64-nightly.apk
+            app/build/outputs/apk/nightly/app-universal-nightly.apk

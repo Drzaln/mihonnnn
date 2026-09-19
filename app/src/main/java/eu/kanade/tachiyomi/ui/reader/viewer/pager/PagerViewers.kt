@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.ui.reader.viewer.pager
 
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
+import eu.kanade.tachiyomi.ui.reader.viewer.AutoScroll
 
 /**
  * Implementation of a left to right PagerViewer.
@@ -49,5 +50,26 @@ class VerticalPagerViewer(activity: ReaderActivity) : PagerViewer(activity) {
      */
     override fun createPager(): Pager {
         return Pager(activity, isHorizontal = false)
+    }
+
+    private var autoScrollElapsed = 0L
+
+    override val supportsAutoScroll: Boolean get() = true
+
+    override fun onAutoScrollStarted() {
+        autoScrollElapsed = 0L
+    }
+
+    override fun onAutoScrollFrame(elapsedMillis: Long, speedPercent: Int): Boolean {
+        autoScrollElapsed += elapsedMillis
+        if (autoScrollElapsed < AutoScroll.pageIntervalMillis(speedPercent)) {
+            return true
+        }
+        autoScrollElapsed = 0L
+        if (pager.currentItem >= adapterItemCount - 1) {
+            return false
+        }
+        moveToNext()
+        return true
     }
 }

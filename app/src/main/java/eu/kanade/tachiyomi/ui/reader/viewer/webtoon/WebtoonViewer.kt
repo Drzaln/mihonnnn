@@ -15,6 +15,7 @@ import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.ui.reader.model.ChapterTransition
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.model.ViewerChapters
+import eu.kanade.tachiyomi.ui.reader.viewer.AutoScroll
 import eu.kanade.tachiyomi.ui.reader.viewer.Viewer
 import eu.kanade.tachiyomi.ui.reader.viewer.ViewerNavigation.NavigationRegion
 import kotlinx.coroutines.MainScope
@@ -71,6 +72,11 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
     private var currentPage: Any? = null
 
     private val threshold: Int by lazy { readerPreferences.readerHideThreshold.get().threshold }
+
+    /**
+     * Fractional pixels carried over between auto-scroll frames, so slow speeds stay smooth.
+     */
+    private var autoScrollRemainder = 0f
 
     init {
         recycler.setItemViewCacheSize(RECYCLER_VIEW_CACHE_SIZE)
@@ -293,6 +299,34 @@ class WebtoonViewer(val activity: ReaderActivity, val isContinuous: Boolean = tr
         } else {
             recycler.scrollBy(0, scrollDistance)
         }
+    }
+
+    override val supportsAutoScroll: Boolean get() = true
+
+    override fun onAutoScrollStarted() {
+        autoScrollRemainder = 0f
+        recycler.stopScroll()
+    }
+
+    override fun onAutoScrollFrame(elapsedMillis: Long, speedPercent: Int): Boolean {
+        if (!recycler.canScrollVertically(1)) {
+            val lastIndex = layoutManager.findLastEndVisibleItemPosition()
+            val lastItem = adapter.items.getOrNull(lastIndex)
+            // Only the absence of a next chapter means the document truly ends here.
+            if (lastItem is ChapterTransition.Next && lastItem.to == null) {
+                return false
+            }
+        }
+
+        val density = activity.resources.displayMetrics.density
+        val speed = speedPercent.coerceIn(AutoScroll.MIN_SPEED, AutoScroll.MAX_SPEED) / 100f
+        autoScrollRemainder += speed * AutoScroll.MAX_DP_PER_SECOND * density * (elapsedMillis / 1000f)
+        val delta = autoScrollRemainder.toInt()
+        if (delta != 0) {
+            autoScrollRemainder -= delta
+            recycler.scrollBy(0, delta)
+        }
+        return true
     }
 
     /**

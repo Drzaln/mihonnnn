@@ -13,5 +13,10 @@ build
 keystore.properties
 local.properties
 
+# Signing keys
+*.jks
+*.keystore
+*.jks.b64
+
 # macOS specific files
 .DS_Store

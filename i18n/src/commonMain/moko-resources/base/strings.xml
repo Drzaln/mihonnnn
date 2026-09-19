@@ -539,6 +539,8 @@
     <string name="dual_page_view_wide">When wide</string>
     <string name="pref_continuous_minwidth">Min width</string>
     <string name="pref_continuous_gap">Gap</string>
+    <string name="pref_auto_scroll_speed">Auto-scroll speed</string>
+    <string name="action_auto_scroll">Auto scroll</string>
 
       <!-- Downloads section -->
     <string name="pref_category_delete_chapters">Delete chapters</string>

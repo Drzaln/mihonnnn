@@ -42,4 +42,22 @@ interface Viewer {
      * return true if the event was handled, false otherwise.
      */
     fun handleGenericMotionEvent(event: MotionEvent): Boolean
+
+    /**
+     * Whether this viewer lays its content out top-to-bottom and supports auto-scrolling.
+     */
+    val supportsAutoScroll: Boolean get() = false
+
+    /**
+     * Called when auto-scroll starts, so the viewer can cancel any running scroll animation.
+     */
+    fun onAutoScrollStarted() {}
+
+    /**
+     * Advances auto-scroll by one frame, where [elapsedMillis] is the time since the previous
+     * frame and [speedPercent] the user-configured speed (1..100).
+     *
+     * Returns false when the end of the content is reached and auto-scroll should stop.
+     */
+    fun onAutoScrollFrame(elapsedMillis: Long, speedPercent: Int): Boolean = false
 }

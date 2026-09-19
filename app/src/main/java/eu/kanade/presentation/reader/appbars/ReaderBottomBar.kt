@@ -25,6 +25,9 @@ fun ReaderBottomBar(
     onClickOrientation: () -> Unit,
     cropEnabled: Boolean,
     onClickCropBorder: () -> Unit,
+    autoScrollAvailable: Boolean = false,
+    autoScrolling: Boolean = false,
+    onToggleAutoScroll: () -> Unit = {},
     onClickSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -53,6 +56,17 @@ fun ReaderBottomBar(
                 painter = painterResource(if (cropEnabled) R.drawable.ic_crop_24dp else R.drawable.ic_crop_off_24dp),
                 contentDescription = stringResource(MR.strings.pref_crop_borders),
             )
+        }
+
+        if (autoScrollAvailable) {
+            IconButton(onClick = onToggleAutoScroll) {
+                Icon(
+                    painter = painterResource(
+                        if (autoScrolling) R.drawable.ic_pause_24dp else R.drawable.ic_play_arrow_24dp,
+                    ),
+                    contentDescription = stringResource(MR.strings.action_auto_scroll),
+                )
+            }
         }
 
         IconButton(onClick = onClickSettings) {
