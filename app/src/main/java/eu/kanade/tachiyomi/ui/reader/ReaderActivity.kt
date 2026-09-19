@@ -31,7 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -81,6 +83,8 @@ import eu.kanade.tachiyomi.util.system.readerBackgroundColor
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
 import eu.kanade.tachiyomi.util.view.setComposeContent
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -89,6 +93,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.sample
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import logcat.LogPriority
 import mihon.app.di.AppGraph
@@ -107,6 +112,8 @@ class ReaderActivity : BaseActivity() {
     private val graph: AppGraph by lazy { metroGraph() }
 
     companion object {
+        private const val AUTO_SCROLL_FRAME_MILLIS = 16L
+
         fun newIntent(context: Context, mangaId: Long?, chapterId: Long?): Intent {
             return Intent(context, ReaderActivity::class.java).apply {
                 putExtra("manga", mangaId)
@@ -139,6 +146,11 @@ class ReaderActivity : BaseActivity() {
     private var loadingIndicator: ReaderProgressIndicator? = null
 
     var isScrollingThroughPages = false
+        private set
+
+    private var autoScrollJob: Job? = null
+
+    private var isAutoScrolling by mutableStateOf(false)
         private set
 
     /**
@@ -338,6 +350,7 @@ class ReaderActivity : BaseActivity() {
      */
     override fun onDestroy() {
         super.onDestroy()
+        stopAutoScroll()
         viewModel.state.value.viewer?.destroy()
         config = null
         menuToggleToast?.cancel()
@@ -517,6 +530,9 @@ class ReaderActivity : BaseActivity() {
                 menuToggleToast?.cancel()
                 menuToggleToast = toast(if (enabled) MR.strings.on else MR.strings.off)
             },
+            autoScrollAvailable = state.viewer?.supportsAutoScroll == true,
+            autoScrolling = isAutoScrolling,
+            onToggleAutoScroll = ::toggleAutoScroll,
             onClickSettings = viewModel::openSettingsDialog,
         )
     }
@@ -533,10 +549,46 @@ class ReaderActivity : BaseActivity() {
         }
     }
 
+    private fun toggleAutoScroll() {
+        if (autoScrollJob != null) {
+            stopAutoScroll()
+        } else {
+            startAutoScroll()
+        }
+    }
+
+    private fun startAutoScroll() {
+        val viewer = viewModel.state.value.viewer ?: return
+        if (!viewer.supportsAutoScroll) return
+
+        stopAutoScroll()
+        viewer.onAutoScrollStarted()
+        isAutoScrolling = true
+        autoScrollJob = lifecycleScope.launch {
+            val frameMillis = AUTO_SCROLL_FRAME_MILLIS
+            while (isActive) {
+                delay(frameMillis)
+                val current = viewModel.state.value.viewer
+                if (current == null || !current.supportsAutoScroll) break
+                val speed = readerPreferences.autoScrollSpeed.get()
+                if (!current.onAutoScrollFrame(frameMillis, speed)) break
+            }
+            isAutoScrolling = false
+            autoScrollJob = null
+        }
+    }
+
+    private fun stopAutoScroll() {
+        autoScrollJob?.cancel()
+        autoScrollJob = null
+        isAutoScrolling = false
+    }
+
     /**
      * Called from the presenter when a manga is ready. Used to instantiate the appropriate viewer.
      */
     private fun updateViewer() {
+        stopAutoScroll()
         val prevViewer = viewModel.state.value.viewer
         val newViewer = ReadingMode.toViewer(viewModel.getMangaReadingMode(), this)
 

@@ -36,11 +36,8 @@ class AppUpdateChecker(
 }
 
 val GITHUB_REPO: String by lazy {
-    if (isNightlyBuildType) {
-        "mihonapp/mihon-preview"
-    } else {
-        "mihonapp/mihon"
-    }
+    // This is a personal fork; updates are published by the fork's GitHub Actions.
+    "Drzaln/mihonnnn"
 }
 
 val RELEASE_TAG: String by lazy {
