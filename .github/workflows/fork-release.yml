@@ -37,13 +37,18 @@ jobs:
       - name: Compute version
         run: echo "COMMIT_COUNT=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
 
+      - name: Decode signing keystore
+        run: echo "$SIGNING_KEY" | base64 -d > "${{ runner.temp }}/antsy.keystore"
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+
       - name: Build
         run: ./gradlew assembleNightly -Penable-updater
         env:
           # Makes the release APK use the keystore from the secrets below, instead of an
           # ephemeral runner-generated debug key - required for in-app updates to install.
           MIHON_GITHUB_RELEASE: true
-          storeFileBase64: ${{ secrets.SIGNING_KEY }}
+          storeFile: ${{ runner.temp }}/antsy.keystore
           storePassword: ${{ secrets.KEY_STORE_PASSWORD }}
           keyAlias: ${{ secrets.ALIAS }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
